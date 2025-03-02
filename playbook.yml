@@ -1,0 +1,57 @@
+---
+- name: Desplegar Jellyfin Stack
+  hosts: 127.0.0.1
+  become: yes
+
+  tasks:
+    - name: Actualizar el sistema
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Instalar dependencias necesarias
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Añadir la clave GPG oficial de Docker
+      shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Añadir el repositorio de Docker
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Instalar Docker y Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Iniciar y habilitar el servicio de Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Levantar contenedores con docker-compose
+      command: docker compose up -d
+      args:
+        chdir: "{{ playbook_dir }}"
